@@ -14,6 +14,11 @@
 
 #define RELAY D3
 #define BAUD_RATE 115200
+#define HTTP_SERVER_PORT 80
+#define MQTT_PORT 8883
+#define DEVICE_NAME "Irrigation"
+
+unsigned int relay_state = 0;
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
@@ -25,14 +30,18 @@ void callback(char *topic, byte *payload, unsigned int length)
         Serial.print((char)payload[i]);
     }
     Serial.println();
+
+    const size_t bufferSize = JSON_OBJECT_SIZE(15) + 20;
+    DynamicJsonBuffer jsonBuffer(bufferSize);
+    JsonObject& obj = jsonBuffer.parseObject(payload);
+
+    relay_state = obj["state"]["desired"]["relay_state"] | relay_state;
+    digitalWrite(RELAY, relay_state);
 }
 
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org");
-
-// WiFi / MQTT
-WiFiClientSecure espClient;
-PubSubClient client(aws_mqtt_server, 8883, callback, espClient); //set  MQTT port number to 8883 as per //standard
+// MQTT
+WiFiClientSecure sslClient;
+PubSubClient mqttClient(aws_mqtt_server, MQTT_PORT, callback, sslClient);
 unsigned long lastMsg = 0;
 
 void working_led()
@@ -43,40 +52,62 @@ void working_led()
     delay(50);
 }
 
-void setup_wifi()
+void setup_ntp()
 {
-    WiFiManager wifiManager;
-    wifiManager.autoConnect("NodeMCU-Arduino-PlatformIO");
-    Serial.println("Connected!");
+    WiFiUDP ntpUDP;
+    NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
     timeClient.begin();
-    while(!timeClient.update()){
+    while (!timeClient.update()) {
         timeClient.forceUpdate();
     }
-    espClient.setX509Time(timeClient.getEpochTime());
+
+    // We need accurate time to validate SSL certificates
+    sslClient.setX509Time(timeClient.getEpochTime());
     Serial.println("Time set");
+}
+
+void setup_wifi_manager()
+{
+    WiFiManager wifiManager;
+//    wifiManager.autoConnect(DEVICE_NAME);
+    wifiManager.autoConnect("NodeMCU-Arduino-PlatformIO");
+    Serial.println("Connected!");
+}
+
+void setup_wifi() {
+  WiFi.begin("McLellan", "minceontoast");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
 }
 
 /**
  * Setup OTA firmware updates via HTTP
  */
-ESP8266WebServer httpServer(81);
+ESP8266WebServer httpServer(HTTP_SERVER_PORT);
 ESP8266HTTPUpdateServer httpUpdater;
 
-void setup_ota()
+void setup_ota_firmware()
 {
-    MDNS.begin("irrigation-webupdate");
-
     httpUpdater.setup(&httpServer);
     httpServer.begin();
 
-    MDNS.addService("http", "tcp", 81);
+    // Advertise our firmware HTTP server with Multicast DNS
+    MDNS.begin(DEVICE_NAME);
+    MDNS.addService("http", "tcp", HTTP_SERVER_PORT);
 }
 
 void setup_certs()
 {
-    if (!SPIFFS.begin())
-    {
+    if (!SPIFFS.begin()) {
         Serial.println("[CERTS] Failed to mount file system");
         return;
     }
@@ -85,51 +116,41 @@ void setup_certs()
     Serial.println(ESP.getFreeHeap());
 
     // Load certificate file
-    File cert = SPIFFS.open("/cert.der", "r"); //replace cert.crt with your uploaded file name
+    File cert = SPIFFS.open("/cert.der", "r");
     if (!cert)
-    {
         Serial.println("[CERTS] Failed to open cert file");
-    }
     else
         Serial.println("[CERTS] Success to open cert file");
 
-    delay(200);
-
-    if (espClient.loadCertificate(cert))
+    if (sslClient.loadCertificate(cert))
         Serial.println("[CERTS] cert loaded");
     else
         Serial.println("[CERTS] cert not loaded");
 
     // Load private key file
-    File private_key = SPIFFS.open("/private.der", "r"); //replace private with your uploaded file name
+    File private_key = SPIFFS.open("/private.der", "r");
     if (!private_key)
-    {
         Serial.println("[CERTS] Failed to open private cert file");
-    }
     else
         Serial.println("[CERTS] Success to open private cert file");
 
-    delay(200);
-
-    if (espClient.loadPrivateKey(private_key))
+    if (sslClient.loadPrivateKey(private_key))
         Serial.println("[CERTS] private key loaded");
     else
         Serial.println("[CERTS] private key not loaded");
 
     // Load CA file
-    File ca = SPIFFS.open("/ca.der", "r"); //replace ca with your uploaded file name
+    File ca = SPIFFS.open("/ca.der", "r");
     if (!ca)
-    {
         Serial.println("[CERTS] Failed to open ca ");
-    }
     else
         Serial.println("[CERTS] Success to open ca");
-    delay(200);
 
-    if (espClient.loadCACert(ca))
+    if (sslClient.loadCACert(ca))
         Serial.println("[CERTS] ca loaded");
     else
         Serial.println("[CERTS] ca failed");
+
     Serial.print("[CERTS] Heap: ");
     Serial.println(ESP.getFreeHeap());
     working_led();
@@ -139,7 +160,7 @@ void publish_loop()
 {
     unsigned long now = millis();
 
-    if (now - lastMsg > 10000) {
+    if (now - lastMsg > 60000 * 60) {
         lastMsg = now;
 
         const size_t bufferSize = JSON_OBJECT_SIZE(15) + 20;
@@ -150,6 +171,7 @@ void publish_loop()
         reported["a_x"] = 1;
         reported["a_y"] = 2;
         reported["a_z"] = 3;
+        reported["relay_state"] = relay_state;
 
         String json_output;
         root.printTo(json_output);
@@ -161,35 +183,26 @@ void publish_loop()
 
         Serial.print("[AWS MQTT] Publish Message:");
         Serial.println(payload);
-        client.publish(aws_mqtt_thing_topic_pub, payload);
+        mqttClient.publish(aws_mqtt_thing_topic_pub, payload);
     }
 }
 
 void aws_reconnect()
 {
-    // Loop until we're reconnected
-    while (!client.connected())
-    {
+    while (!mqttClient.connected()) {
         Serial.print("[AWS] Attempting MQTT connection...");
-        // Attempt to connect
-        if (client.connect(aws_mqtt_client_id))
-        {
+        if (mqttClient.connect(aws_mqtt_client_id)) {
             Serial.println("[AWS] connected");
-            // ... and resubscribe
-            client.subscribe(aws_mqtt_thing_topic_sub);
-        }
-        else
-        {
+            mqttClient.subscribe(aws_mqtt_thing_topic_sub);
+        } else {
             Serial.print("[AWS] failed, rc=");
-            Serial.print(client.state());
+            Serial.print(mqttClient.state());
             Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
 
             char buf[256];
-            espClient.getLastSSLError(buf,256);
+            sslClient.getLastSSLError(buf,256);
             Serial.print("WiFiClientSecure SSL error: ");
             Serial.println(buf);
-
             working_led();
             delay(5000);
         }
@@ -198,30 +211,27 @@ void aws_reconnect()
 
 void setup()
 {
-    // Debug LED
     pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(RELAY, OUTPUT);
+    digitalWrite(RELAY, LOW);
+
     Serial.begin(BAUD_RATE);
-    delay(200);
     setup_wifi();
-    delay(200);
-    setup_ota();
-    delay(200);
+    setup_ntp();
+    setup_ota_firmware();
     setup_certs();
-    delay(200);
-    aws_reconnect();
 }
 
 void loop()
 {
-    if (!client.connected()) {
-
+    if (!mqttClient.connected()) {
         aws_reconnect();
     }
 
-//     Process any incoming messages
-    client.loop();
+    // Process any incoming MQTT messages
+    mqttClient.loop();
 
-//     OTA updater
+    // OTA updater
     httpServer.handleClient();
     MDNS.update();
 
