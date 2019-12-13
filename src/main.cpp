@@ -18,7 +18,16 @@
 #define MQTT_PORT 8883
 #define DEVICE_NAME "Irrigation"
 
-unsigned int relay_state = 0;
+// The current relay state. Our relay is inverse logic
+unsigned int relay_state = 1;
+
+// How many seconds the relay has been requested to be on for
+unsigned long relay_on_timer = 0;
+
+// When the relay should be turned off
+unsigned long relay_off_time = 0;
+
+void publish_state();
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
@@ -36,7 +45,14 @@ void callback(char *topic, byte *payload, unsigned int length)
     JsonObject& obj = jsonBuffer.parseObject(payload);
 
     relay_state = obj["state"]["desired"]["relay_state"] | relay_state;
-    digitalWrite(RELAY, relay_state);
+
+    if (obj["state"]["desired"]["relay_on_timer"]) {
+        Serial.print("Setting `relay_on_timer` for ");
+        Serial.print((int)obj["state"]["desired"]["relay_on_timer"]);
+        Serial.println();
+        relay_on_timer = (int)obj["state"]["desired"]["relay_on_timer"];
+        relay_off_time = millis() + relay_on_timer;
+    }
 }
 
 // MQTT
@@ -70,8 +86,7 @@ void setup_ntp()
 void setup_wifi_manager()
 {
     WiFiManager wifiManager;
-//    wifiManager.autoConnect(DEVICE_NAME);
-    wifiManager.autoConnect("NodeMCU-Arduino-PlatformIO");
+    wifiManager.autoConnect(DEVICE_NAME);
     Serial.println("Connected!");
 }
 
@@ -156,34 +171,48 @@ void setup_certs()
     working_led();
 }
 
-void publish_loop()
+void publish_state()
+{
+    const size_t bufferSize = JSON_OBJECT_SIZE(15) + 20;
+    DynamicJsonBuffer jsonBuffer(bufferSize);
+    JsonObject &root = jsonBuffer.createObject();
+    JsonObject &state = root.createNestedObject("state");
+    JsonObject &reported = state.createNestedObject("reported");
+    reported["relay_state"] = relay_state;
+    reported["relay_on_timer"] = relay_on_timer;
+
+    String json_output;
+    root.printTo(json_output);
+    char payload[bufferSize];
+
+    // Construct payload item
+    json_output.toCharArray(payload, bufferSize);
+    sprintf(payload, json_output.c_str());
+
+    Serial.print("[AWS MQTT] Publish Message:");
+    Serial.println(payload);
+    mqttClient.publish(aws_mqtt_thing_topic_pub, payload);
+}
+
+void relay_loop()
 {
     unsigned long now = millis();
 
-    if (now - lastMsg > 60000 * 60) {
-        lastMsg = now;
+    if (relay_off_time && now > relay_off_time) {
+        relay_on_timer = 0;
+        relay_off_time = 0;
+        relay_state = 1;
+        Serial.println("Relay on timer ended");
+    }
 
-        const size_t bufferSize = JSON_OBJECT_SIZE(15) + 20;
-        DynamicJsonBuffer jsonBuffer(bufferSize);
-        JsonObject &root = jsonBuffer.createObject();
-        JsonObject &state = root.createNestedObject("state");
-        JsonObject &reported = state.createNestedObject("reported");
-        reported["a_x"] = 1;
-        reported["a_y"] = 2;
-        reported["a_z"] = 3;
-        reported["relay_state"] = relay_state;
+    if (relay_off_time && now < relay_off_time && relay_state == 1) {
+        relay_state = 0;
+        Serial.println("Relay on timer started ");
+    }
 
-        String json_output;
-        root.printTo(json_output);
-        char payload[bufferSize];
-
-        // Construct payload item
-        json_output.toCharArray(payload, bufferSize);
-        sprintf(payload, json_output.c_str());
-
-        Serial.print("[AWS MQTT] Publish Message:");
-        Serial.println(payload);
-        mqttClient.publish(aws_mqtt_thing_topic_pub, payload);
+    if (relay_state != digitalRead(RELAY)) {
+        digitalWrite(RELAY, relay_state);
+        publish_state();
     }
 }
 
@@ -231,10 +260,12 @@ void loop()
     // Process any incoming MQTT messages
     mqttClient.loop();
 
+    relay_loop();
+
     // OTA updater
     httpServer.handleClient();
     MDNS.update();
 
     // Occasionally send a dummy MQTT message
-    publish_loop();
+//    publish_loop();
 }
