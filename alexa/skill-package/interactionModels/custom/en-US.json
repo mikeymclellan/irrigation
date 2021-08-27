@@ -1,0 +1,59 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "irrigation",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "WaterLawnIntent",
+          "samples": [
+            "{d_action} the lawn"
+          ],
+          "slots": [
+            {
+              "name": "d_action",
+              "type": "d_action_type"
+            }
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "d_action_type",
+          "values": [
+            {
+              "name": {
+                "value": "water"
+              }
+            },
+            {
+              "name": {
+                "value": "sprinkle"
+              }
+            },
+            {
+              "name": {
+                "value": "stop"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

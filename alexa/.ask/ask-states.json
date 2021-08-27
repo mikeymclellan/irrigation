@@ -1,0 +1,70 @@
+{
+  "askcliStatesVersion": "2020-03-31",
+  "profiles": {
+    "default": {
+      "skillInfrastructure": {
+        "@ask-cli/cfn-deployer": {
+          "deployState": {
+            "default": {
+              "s3": {
+                "bucket": "ask-irrigation-skill-mclellan-apsoutheast2-1630008856769",
+                "key": "endpoint/build.zip"
+              },
+              "stackId": "arn:aws:cloudformation:ap-southeast-2:545924583002:stack/ask-irrigation-skill-default-skillStack-1630008856769/32c808e0-06aa-11ec-84d5-062b911ca274",
+              "outputs": [
+                {
+                  "OutputKey": "SkillEndpoint",
+                  "OutputValue": "arn:aws:lambda:ap-southeast-2:545924583002:function:ask-irrigation-skill-default-sk-AlexaSkillFunction-aF3dR6FEAQQq",
+                  "Description": "LambdaARN for the regional endpoint"
+                }
+              ]
+            },
+            "FE": {
+              "s3": {
+                "bucket": "ask-irrigation-skill-mclellan-uswest2-1630008856766",
+                "key": "endpoint/build.zip"
+              },
+              "stackId": "arn:aws:cloudformation:us-west-2:545924583002:stack/ask-irrigation-skill-FE-skillStack-1630008856766/352c5eb0-06aa-11ec-9049-06c8e775775f",
+              "outputs": [
+                {
+                  "OutputKey": "SkillEndpoint",
+                  "OutputValue": "arn:aws:lambda:us-west-2:545924583002:function:ask-irrigation-skill-FE-skillSt-AlexaSkillFunction-2Eaa9HkB56mr",
+                  "Description": "LambdaARN for the regional endpoint"
+                }
+              ]
+            },
+            "EU": {
+              "s3": {
+                "bucket": "ask-irrigation-skill-mclellan-euwest1-1630008856725",
+                "key": "endpoint/build.zip"
+              },
+              "stackId": "arn:aws:cloudformation:eu-west-1:545924583002:stack/ask-irrigation-skill-EU-skillStack-1630008856725/3931e160-06aa-11ec-8f61-024fd24e8a2d",
+              "outputs": [
+                {
+                  "OutputKey": "SkillEndpoint",
+                  "OutputValue": "arn:aws:lambda:eu-west-1:545924583002:function:ask-irrigation-skill-EU-skillSt-AlexaSkillFunction-7Wta5pf6qspb",
+                  "Description": "LambdaARN for the regional endpoint"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "skillId": "amzn1.ask.skill.ceb9b44f-1991-4269-9f68-b9a76c638153",
+      "skillMetadata": {
+        "lastDeployHash": "c1jT034OeDFJu8p/kpby6ywCUzc="
+      },
+      "code": {
+        "FE": {
+          "lastDeployHash": "BoEmLEvRVFuoql7gEIBMgQDVfbA="
+        },
+        "default": {
+          "lastDeployHash": "BoEmLEvRVFuoql7gEIBMgQDVfbA="
+        },
+        "EU": {
+          "lastDeployHash": "BoEmLEvRVFuoql7gEIBMgQDVfbA="
+        }
+      }
+    }
+  }
+}

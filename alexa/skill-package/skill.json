@@ -1,0 +1,44 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "summary": "Learn fun facts about space.",
+          "examplePhrases": [
+            "Alexa open irrigation",
+            "Alexa ask irrigation to water the lawn",
+            "Alexa tell irrigation to water the lawn"
+          ],
+          "keywords": [
+            "irrigation",
+            "water",
+            "lawn"
+          ],
+          "name": "Irrigation",
+          "description": "Ask for Space Facts, and learn about what really matters, like dark matter.\n\nSpace Facts provides fun the whole family can enjoy and is guaranteed to make you smarter.\n\nTo start, just say \"Alexa, launch Space Facts\" or \"Alexa, open Space Facts\" to get a fact\".\n\nAt anytime, you can stop by saying \"Alexa, stop\""
+        }
+      },
+      "category": "KNOWLEDGE_AND_TRIVIA"
+    },
+    "apis": {
+      "custom": {
+        "regions": {
+          "FE": {
+            "endpoint": {
+              "uri": "arn:aws:lambda:us-west-2:545924583002:function:ask-irrigation-skill-FE-skillSt-AlexaSkillFunction-2Eaa9HkB56mr"
+            }
+          },
+          "EU": {
+            "endpoint": {
+              "uri": "arn:aws:lambda:eu-west-1:545924583002:function:ask-irrigation-skill-EU-skillSt-AlexaSkillFunction-7Wta5pf6qspb"
+            }
+          }
+        },
+        "endpoint": {
+          "uri": "arn:aws:lambda:ap-southeast-2:545924583002:function:ask-irrigation-skill-default-sk-AlexaSkillFunction-aF3dR6FEAQQq"
+        }
+      }
+    },
+    "manifestVersion": "1.0"
+  }
+}
