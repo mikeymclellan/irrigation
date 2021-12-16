@@ -104,16 +104,28 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
+void check_wifi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    setup_wifi();
+  }
+}
+
 /**
  * Setup OTA firmware updates via HTTP
  */
 ESP8266WebServer httpServer(HTTP_SERVER_PORT);
 ESP8266HTTPUpdateServer httpUpdater;
 
+void handleRoot()
+{
+  httpServer.send(200, "text/plain", "hello from esp8266!\r\n");
+}
+
 void setup_ota_firmware()
 {
     httpUpdater.setup(&httpServer);
     httpServer.begin();
+    httpServer.on("/", handleRoot);
 
     // Advertise our firmware HTTP server with Multicast DNS
     MDNS.begin(DEVICE_NAME);
@@ -266,6 +278,7 @@ void loop()
     httpServer.handleClient();
     MDNS.update();
 
+    check_wifi();
     // Occasionally send a dummy MQTT message
 //    publish_loop();
 }
