@@ -78,7 +78,7 @@ const WaterLawnHandler = {
       speakOutput = requestAttributes.t('SPRINKLING_LAWN');
     }
     else if (d_action_value === "water") {
-        await updateDeviceShadow('relay_on_timer', 600000);
+        await updateDeviceShadow('relay_on_timer', 1800000);
         speakOutput = requestAttributes.t('WATERING_LAWN');
     } else {
       await updateDeviceShadow('relay_on_timer', 1);

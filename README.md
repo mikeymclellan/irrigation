@@ -3,10 +3,16 @@ platformio run --target upload
 platformio device monitor
 
 
-aws --profile mclellan iot-data publish --topic '$aws/things/si-03/shadow/update' --payload '{"state":{"desired":{"relay_state":1}}}'
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    sudo ./aws/install
 
-aws --profile mclellan iot-data publish --topic '$aws/things/si-03/shadow/update' --payload '{"state":{"desired":{"relay_on_timer":15000}}}'
+    /usr/local/bin/aws iot-data publish --topic '$aws/things/si-03/shadow/update' --payload '{"state":{"desired":{"relay_state":1}}}' --cli-binary-format raw-in-base64-out --region ap-southeast-2
 
+    /usr/local/bin/aws iot-data publish --topic '$aws/things/si-03/shadow/update' --payload '{"state":{"desired":{"relay_on_timer":15000}}}' --cli-binary-format raw-in-base64-out --region ap-southeast-2
+
+
+    0 16 */3 * * /usr/local/bin/aws iot-data publish --topic '$aws/things/si-03/shadow/update' --payload '{"state":{"desired":{"relay_on_timer":1800000}}}' --cli-binary-format raw-in-base64-out --region ap-southeast-2
 
 
 Walk thru https://devopstar.com/2019/02/07/aws-sumerian-magic-cube/ 
