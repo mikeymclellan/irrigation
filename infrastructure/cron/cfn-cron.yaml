@@ -1,0 +1,114 @@
+# Quick-n-dirty cronjob to run the irrigation
+#
+#
+# aws cloudformation deploy --template-file cfn-cron.yaml --stack-name irrigation-cron --profile mclellan --region ap-southeast-2 --capabilities CAPABILITY_IAM
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Irrigate Cronjob
+
+Resources:
+  LambdaRole: #logical name of the resource
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com #allow lambda to assume that role
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  IotAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: OpenVPNAccessPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - iot:*
+            Effect: Allow
+            Resource: "*"
+      Roles:
+        - !Ref LambdaRole
+
+  CronFunction: #logical name of the resource
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: #locate the code of the function
+        ZipFile:
+          !Sub |
+              //AWS SDK will be sued to invoke device shadow from lambda function
+              var AWS = require('aws-sdk');
+
+              //This should be the device name mentioned in AWs IoT Core.
+              //In real life scenario, this should be captured as part of registraion
+              const topic = '$aws/things/si-03/shadow/update'
+
+              // const ioT_EndPoint = 'data.iot.us-east-1.amazonaws.com' // Ensure you are using the right endpoint
+              const ioT_EndPoint = 'data.iot.ap-southeast-2.amazonaws.com' // Ensure you are using the right endpoint
+
+              //Device Shadow message
+              var shadowMessage = {
+                "state": {
+                  "desired": {}
+                }
+              }
+
+              function updateDeviceShadow(obj, command) {
+                return new Promise((resolve, reject) => {
+                  shadowMessage.state.desired[obj] = command;
+                  var iotdata = new AWS.IotData({ endpoint: ioT_EndPoint });
+                  var params = {
+                    payload: JSON.stringify(shadowMessage),
+                    topic: topic
+                  };
+
+                  iotdata.publish(params, function(err, data) {
+                    if (err)
+                      console.log(err, err.stack); // an error occurred
+                    else
+                      console.log(data);
+                    //reset the shadow
+                    shadowMessage.state.desired = {}
+                    resolve();
+                  });
+                });
+              }
+
+              exports.handler = async function(event, context) {
+
+                await updateDeviceShadow('relay_on_timer', 1800000);
+
+                console.log("running code");
+                context.succeed("done");
+              };
+
+      Handler: index.handler
+      Role:
+        Fn::GetAtt: [ LambdaRole , "Arn" ] #reference the already defined role by its Arn
+      Runtime: nodejs14.x
+      Timeout: 60 #timeout for the lambda
+
+  CronEvent: #logical name of the resource
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: cron(0 17 * 12,1,2,3,4 * *) #when the event should trigger
+      Targets:
+        - Arn:
+            Fn::GetAtt: [ CronFunction , "Arn" ] #reference the lambda function by its arn
+          Id:
+            Ref: CronFunction #unique name of the target
+
+  LambdaInvokePermission: #logical name of the resource
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt: [ CronFunction ,"Arn" ] #reference the lambda function by its arn
+      Action: lambda:InvokeFunction #allow invoking of lambda functions
+      Principal: events.amazonaws.com #grant permission to the events system
+      SourceArn:
+        Fn::GetAtt: [ CronEvent , "Arn" ] #define which event is allowed to trigger lambdas

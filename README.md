@@ -25,3 +25,8 @@ Alexa Skill to publish to IoT topic is an [ASK](https://developer.amazon.com/en-
     platformio run && cp .pio/build/nodemcuv2/firmware.bin ~/Downloads/
 
 Then open http://Irrigation.local/update in your browser and upload the firmware.bin file.
+
+
+## Quick-n-dirty cronjob to run the irrigation
+
+    aws cloudformation deploy --template-file irrigation/cron/cfn-cron.yaml --stack-name irrigation-cron --profile mclellan --region ap-southeast-2 --capabilities CAPABILITY_IAM
