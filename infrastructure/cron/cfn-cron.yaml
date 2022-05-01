@@ -96,7 +96,7 @@ Resources:
   CronEvent: #logical name of the resource
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: cron(0 17 * 12,1,2,3,4 * *) #when the event should trigger
+      ScheduleExpression: cron(0 17 * 1,2,3,4,5,12 ? *) #when the event should trigger
       Targets:
         - Arn:
             Fn::GetAtt: [ CronFunction , "Arn" ] #reference the lambda function by its arn
